@@ -150,6 +150,16 @@ export default function Dashboard() {
     setIsPracticing(false);
   };
 
+  const playTTS = (text) => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'zh-CN';
+      utterance.rate = 0.8;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
   const handlePracticeToggle = () => {
     setIsPracticing(true);
   };
