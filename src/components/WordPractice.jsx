@@ -8,6 +8,8 @@ export default function WordPractice({ activeChar, onComplete }) {
   const [feedback, setFeedback] = useState(null);
   const [showOutline, setShowOutline] = useState(true);
   const [completedChars, setCompletedChars] = useState(new Set());
+  const [mistakes, setMistakes] = useState(0);
+  const mistakesRef = useRef(0);
 
   // Dynamic Size Calculation based on word length
   // 1-2 chars = 180px, 3 chars = 140px, 4+ chars = 110px
@@ -29,6 +31,8 @@ export default function WordPractice({ activeChar, onComplete }) {
     writerRefs.current = [];
     setCompletedChars(new Set());
     setFeedback(null);
+    setMistakes(0);
+    mistakesRef.current = 0;
 
     chars.forEach((char, index) => {
       const container = writerContainerRefs.current[index];
@@ -54,6 +58,8 @@ export default function WordPractice({ activeChar, onComplete }) {
       const setupQuiz = () => {
          writer.quiz({
             onMistake: (strokeData) => {
+              mistakesRef.current += 1;
+              setMistakes(mistakesRef.current);
               setFeedback({ type: 'mistake', msg: `Chữ ${index + 1}: Lỗi ở nét ${strokeData.strokeNum + 1}` });
             },
             onCorrectStroke: (strokeData) => {
@@ -62,9 +68,9 @@ export default function WordPractice({ activeChar, onComplete }) {
             onComplete: (summaryData) => {
               setCompletedChars(prev => {
                 const newSet = new Set(prev);
-                newSet.add(index);
+                 newSet.add(index);
                 if (newSet.size === chars.length) {
-                  setFeedback({ type: 'success', msg: `Tuyệt vời! Hoàn thành từ vựng.` });
+                  setFeedback({ type: 'success', msg: `Tuyệt vời! Bạn đã hoàn thành từ vựng.` });
                   playTTS(activeChar.character);
                   if (onComplete) onComplete();
                 }
@@ -143,24 +149,40 @@ export default function WordPractice({ activeChar, onComplete }) {
                {completedChars.has(index) ? (
                  <CheckCircle size={20} color="var(--success)"/>
                ) : (
-                 <div style={{height: '20px', fontSize: '0.8rem', color: 'var(--text-secondary)'}}>{index + 1}</div>
+                 <div style={{height: '20px', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none'}}>{index + 1}</div>
                )}
             </div>
           ))}
        </div>
 
-       <div className="feedback-area" style={{minHeight: '40px', display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
+        <div className="feedback-area" style={{minHeight: '60px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '0.5rem'}}>
          {feedback ? (
-           <div className="feedback-badge" style={{
-              display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', borderRadius: '20px',
-              background: feedback.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-              color: feedback.type === 'success' ? '#34d399' : '#fca5a5'
-           }}>
-              {feedback.type === 'success' ? <CheckCircle size={18} /> : <XCircle size={18} />}
-              {feedback.msg}
-           </div>
+           <>
+             <div className="feedback-badge" style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1.2rem', borderRadius: '20px',
+                background: feedback.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                color: feedback.type === 'success' ? '#34d399' : '#fca5a5',
+                fontWeight: '500'
+             }}>
+                {feedback.type === 'success' ? <CheckCircle size={18} /> : <XCircle size={18} />}
+                {feedback.msg}
+             </div>
+             
+             {/* Hiển thị số lỗi riêng biệt màu đỏ khi hoàn thành */}
+             {feedback.type === 'success' && (
+               <div style={{
+                 padding: '0.4rem 1rem', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.2)', 
+                 color: '#ff6b6b', fontSize: '0.9rem', fontWeight: '600', border: '1px solid rgba(239, 68, 68, 0.3)'
+               }}>
+                 Tổng số lỗi: {mistakes}
+               </div>
+             )}
+           </>
          ) : (
-           <p className="text-secondary" style={{margin: 0, fontSize: '0.9rem'}}>Viết các nét theo thứ tự vào phía trên</p>
+           <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem'}}>
+             <p className="text-secondary" style={{margin: 0, fontSize: '0.9rem'}}>Viết các nét theo thứ tự vào phía trên</p>
+             {mistakes > 0 && <span style={{fontSize: '0.85rem', color: '#fca5a5'}}>Số lỗi hiện tại: {mistakes}</span>}
+           </div>
          )}
        </div>
 
