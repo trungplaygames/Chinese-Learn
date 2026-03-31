@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import HanziDisplay from '../components/HanziDisplay';
 import { generateCharacterData } from '../lib/gemini';
-import { Plus, X, Folder, BookOpen, Wand2, Volume2, Edit2, Trash2, Filter, PenTool } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import WordPractice from '../components/WordPractice';
+import { playTTS, getChineseVoices, saveVoicePreference, loadVoicePreference, getTTSEngine, setTTSEngine } from '../lib/tts';
+import { Plus, X, Folder, BookOpen, Wand2, Volume2, Edit2, Trash2, Filter, PenTool, Settings, Sparkles, Cpu, EyeOff, Type, Languages, BookOpen as BookIcon } from 'lucide-react';
 import './Dashboard.css';
 
 export default function Dashboard() {
@@ -20,6 +21,15 @@ export default function Dashboard() {
   const [addingChar, setAddingChar] = useState(false);
   const [loadingAutofill, setLoadingAutofill] = useState(false);
   const [filterWeek, setFilterWeek] = useState('all');
+  
+  const [showHanzi, setShowHanzi] = useState(true);
+  const [showPinyin, setShowPinyin] = useState(true);
+  const [showMeaning, setShowMeaning] = useState(true);
+  
+  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
+  const [availableVoices, setAvailableVoices] = useState([]);
+  const [currentVoiceName, setCurrentVoiceName] = useState('');
+  const [currentTTSEngine, setCurrentTTSEngine] = useState('system'); // 'system' or 'google'
 
   const [newChar, setNewChar] = useState({ 
     character: '', pinyin: '', meaning: '', topic: '',
@@ -46,7 +56,31 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchCharacters();
+    
+    // Khởi tạo giọng nói
+    const initVoices = () => {
+      const v = getChineseVoices();
+      setAvailableVoices(v);
+      const pref = loadVoicePreference();
+      if (pref) setCurrentVoiceName(pref.name);
+      setCurrentTTSEngine(getTTSEngine());
+    };
+
+    initVoices();
+    window.speechSynthesis.onvoiceschanged = initVoices;
   }, []);
+
+  const handleVoiceChange = (name) => {
+    saveVoicePreference(name);
+    setCurrentVoiceName(name);
+    playTTS("你好", 1); 
+  };
+
+  const handleEngineChange = (engine) => {
+    setTTSEngine(engine);
+    setCurrentTTSEngine(engine);
+    playTTS("你好");
+  };
 
   const openAppModal = () => {
     setIsQuickAdd(false);
@@ -145,19 +179,15 @@ export default function Dashboard() {
     }
   };
 
+  const openEditModal = (item) => {
+    setSelectedWord(item);
+    setIsPracticing(false);
+    playTTS(item.character);
+  };
+
   const closeEditModal = () => {
     setSelectedWord(null);
     setIsPracticing(false);
-  };
-
-  const playTTS = (text) => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'zh-CN';
-      utterance.rate = 0.8;
-      window.speechSynthesis.speak(utterance);
-    }
   };
 
   const handlePracticeToggle = () => {
@@ -199,8 +229,16 @@ export default function Dashboard() {
                </Select>
              </div>
           )}
+          <div className="glass-panel" style={{display: 'flex', alignItems:'center', gap: '0.75rem', padding: '0.5rem 0.75rem'}}>
+             <button onClick={() => setShowHanzi(!showHanzi)} className={`toggle-btn ${showHanzi ? 'active' : ''}`} title="Ẩn/Hiện Chữ Hán"><Type size={16}/></button>
+             <button onClick={() => setShowPinyin(!showPinyin)} className={`toggle-btn ${showPinyin ? 'active' : ''}`} title="Ẩn/Hiện Pinyin"><Languages size={16}/></button>
+             <button onClick={() => setShowMeaning(!showMeaning)} className={`toggle-btn ${showMeaning ? 'active' : ''}`} title="Ẩn/Hiện Nghĩa & Topic"><BookIcon size={16}/></button>
+          </div>
           <button className="btn btn-primary" onClick={() => { setModalTitle('Thêm Từ Mới'); openAppModal(); }}>
             <Plus size={18} /> Thêm Mới
+          </button>
+          <button className="btn btn-secondary" style={{padding: '0.6rem'}} onClick={() => setShowVoiceSettings(true)}>
+             <Settings size={20} />
           </button>
         </div>
       </div>
@@ -231,14 +269,24 @@ export default function Dashboard() {
                      
                      <div className="character-grid mini-grid mt-4">
                       {groupedCharacters[week][session].map(item => (
-                        <div key={item.id} className="character-card small-card clickable" onClick={() => setSelectedWord(item)}>
+                        <div key={item.id} className="character-card small-card clickable" onClick={() => openEditModal(item)}>
                           <div className="char-display-wrap">
-                            <span style={{fontSize: item.character.length > 2 ? '2rem' : '3.5rem', fontWeight:'500'}}>{item.character}</span>
+                            {showHanzi ? (
+                              <span style={{fontSize: item.character.length > 2 ? '2rem' : '3.5rem', fontWeight:'500'}}>{item.character}</span>
+                            ) : (
+                              <div style={{height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                                <EyeOff size={32} style={{opacity: 0.2}}/>
+                              </div>
+                            )}
                           </div>
                           <div className="char-info">
-                            <h3 className="char-pinyin">{item.pinyin}</h3>
-                            <p className="char-meaning">{item.meaning}</p>
-                            {item.topic && <span className="topic-badge">{item.topic}</span>}
+                            {showPinyin && <h3 className="char-pinyin">{item.pinyin}</h3>}
+                            {showMeaning && (
+                              <>
+                                <p className="char-meaning">{item.meaning}</p>
+                                {item.topic && <span className="topic-badge">{item.topic}</span>}
+                              </>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -329,7 +377,7 @@ export default function Dashboard() {
 
              {isPracticing ? (
                <div style={{marginTop: '1.5rem'}}>
-                 <WordPractice activeChar={selectedWord} />
+                 <WordPractice key={selectedWord.id + "-practice"} activeChar={selectedWord} initialDelay={500} />
                </div>
              ) : (
                <>
@@ -377,6 +425,77 @@ export default function Dashboard() {
                </>
              )}
           </div>
+        </div>
+      )}
+
+      {/* Voice Settings Modal */}
+      {showVoiceSettings && (
+        <div className="modal-overlay" onClick={() => setShowVoiceSettings(false)}>
+           <div className="modal-content glass-panel" style={{maxWidth: '450px'}} onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                 <h3>Cài đặt Giọng đọc</h3>
+                 <button className="close-btn" onClick={() => setShowVoiceSettings(false)}><X size={20}/></button>
+              </div>
+              
+              <div className="p-4" style={{marginTop: '1rem'}}>
+                 <div className="form-group" style={{marginBottom: '2rem'}}>
+                    <label style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem'}}>
+                       <Sparkles size={16} className="text-pink-400" /> Chế độ giọng đọc
+                    </label>
+                    <div style={{display: 'flex', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.3rem', borderRadius: '12px'}}>
+                       <button 
+                          className={`btn ${currentTTSEngine === 'google' ? 'btn-primary' : 'btn-ghost'}`}
+                          style={{flex: 1, padding: '0.6rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem'}}
+                          onClick={() => handleEngineChange('google')}
+                       >
+                          <Sparkles size={14} /> AI Cao cấp
+                       </button>
+                       <button 
+                          className={`btn ${currentTTSEngine === 'system' ? 'btn-primary' : 'btn-ghost'}`}
+                          style={{flex: 1, padding: '0.6rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem'}}
+                          onClick={() => handleEngineChange('system')}
+                       >
+                          <Cpu size={14} /> Hệ thống
+                       </button>
+                    </div>
+                 </div>
+
+                 {currentTTSEngine === 'system' && (
+                    <div className="form-group animate-in fade-in slide-in-from-top-2 duration-300">
+                       <label style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem'}}>
+                          Danh sách giọng tiếng Trung khả dụng
+                       </label>
+                       <Select value={currentVoiceName} onValueChange={handleVoiceChange}>
+                          <SelectTrigger className="w-full bg-slate-800/40 border-white/10 text-white h-12">
+                             <SelectValue placeholder="Chọn một giọng đọc" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-[#131720] border-white/10 text-white max-h-[300px] z-[2000]">
+                             {availableVoices.map(voice => (
+                                <SelectItem key={voice.name} value={voice.name} className="focus:bg-white/10 cursor-pointer">
+                                   {voice.name} ({voice.lang})
+                                </SelectItem>
+                             ))}
+                          </SelectContent>
+                       </Select>
+                    </div>
+                 )}
+
+                 {currentTTSEngine === 'google' && (
+                    <div className="p-4 rounded-xl bg-pink-500/5 border border-pink-500/10 animate-in fade-in slide-in-from-top-2 duration-300">
+                       <p className="text-secondary" style={{fontSize: '0.85rem', margin: 0}}>
+                          Chế độ AI sử dụng giọng đọc <strong>Neural (High-Quality)</strong> của Google. 
+                          Giọng này vô cùng tự nhiên, chuẩn xác nhưng cần có kết nối mạng để tải âm thanh.
+                       </p>
+                    </div>
+                 )}
+                 
+                 <div style={{marginTop: '2rem'}}>
+                    <button className="btn btn-primary" style={{width: '100%'}} onClick={() => setShowVoiceSettings(false)}>
+                        Hoàn tất
+                    </button>
+                 </div>
+              </div>
+           </div>
         </div>
       )}
     </div>

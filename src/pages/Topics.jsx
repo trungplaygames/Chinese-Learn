@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Hash, ChevronLeft, Volume2, PenTool, X } from 'lucide-react';
+import { Hash, ChevronLeft, Volume2, PenTool, X, EyeOff, Type, Languages, BookOpen as BookIcon } from 'lucide-react';
+import { playTTS } from '../lib/tts';
 import WordPractice from '../components/WordPractice';
 import './Dashboard.css';
 
@@ -10,6 +11,10 @@ export default function Topics() {
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [topicWordModal, setTopicWordModal] = useState(null);
   const [isPracticing, setIsPracticing] = useState(false);
+
+  const [showHanzi, setShowHanzi] = useState(true);
+  const [showPinyin, setShowPinyin] = useState(true);
+  const [showMeaning, setShowMeaning] = useState(true);
 
   const fetchCharacters = async () => {
     try {
@@ -38,16 +43,6 @@ export default function Topics() {
     return acc;
   }, {});
 
-  const playTTS = (text) => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'zh-CN';
-      utterance.rate = 0.8;
-      window.speechSynthesis.speak(utterance);
-    }
-  };
-
   const handlePracticeToggle = () => {
     setIsPracticing(true);
   };
@@ -66,20 +61,35 @@ export default function Topics() {
         <button className="btn btn-secondary" onClick={() => setSelectedTopic(null)} style={{marginBottom: '2rem'}}>
           <ChevronLeft size={18} /> Quay lại thẻ Chủ đề
         </button>
-        <h2 style={{marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-          <Hash size={24} color="var(--accent-primary)"/> Chủ đề: {selectedTopic} ({topicChars.length} từ)
-        </h2>
+        <div style={{marginBottom: '2rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'center'}}>
+          <h2 style={{margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+            <Hash size={24} color="var(--accent-primary)"/> {selectedTopic} ({topicChars.length})
+          </h2>
+          <div className="glass-panel" style={{display: 'flex', alignItems:'center', gap: '0.75rem', padding: '0.5rem 0.75rem'}}>
+             <button onClick={() => setShowHanzi(!showHanzi)} className={`toggle-btn ${showHanzi ? 'active' : ''}`} title="Ẩn/Hiện Chữ Hán"><Type size={16}/></button>
+             <button onClick={() => setShowPinyin(!showPinyin)} className={`toggle-btn ${showPinyin ? 'active' : ''}`} title="Ẩn/Hiện Pinyin"><Languages size={16}/></button>
+             <button onClick={() => setShowMeaning(!showMeaning)} className={`toggle-btn ${showMeaning ? 'active' : ''}`} title="Ẩn/Hiện Nghĩa"><BookIcon size={16}/></button>
+          </div>
+        </div>
         
         <div className="character-grid">
           {topicChars.map(item => (
-            <div className="character-card glass-panel clickable" onClick={() => { setTopicWordModal(item); setIsPracticing(false); }}>
+            <div className="character-card glass-panel clickable" onClick={() => { setTopicWordModal(item); setIsPracticing(false); playTTS(item.character); }}>
               <div className="char-display-wrap" style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80px'}}>
-                <span style={{fontSize: item.character.length > 2 ? '2rem' : '3.5rem', fontWeight:'500'}}>{item.character}</span>
+                {showHanzi ? (
+                  <span style={{fontSize: item.character.length > 2 ? '2rem' : '3.5rem', fontWeight:'500'}}>{item.character}</span>
+                ) : (
+                  <EyeOff size={32} style={{opacity: 0.2}}/>
+                )}
               </div>
               <div className="char-info">
-                <h3 className="char-pinyin">{item.pinyin}</h3>
-                <p className="char-meaning">{item.meaning}</p>
-                <span className="topic-badge">Tuần {item.week_no} - {item.session_no}</span>
+                {showPinyin && <h3 className="char-pinyin">{item.pinyin}</h3>}
+                {showMeaning && (
+                  <>
+                    <p className="char-meaning">{item.meaning}</p>
+                    <span className="topic-badge">Tuần {item.week_no} - {item.session_no}</span>
+                  </>
+                )}
               </div>
             </div>
           ))}
@@ -96,7 +106,7 @@ export default function Topics() {
                
                {isPracticing ? (
                   <div style={{marginTop: '1.5rem'}}>
-                    <WordPractice activeChar={topicWordModal} />
+                    <WordPractice key={topicWordModal.id + "-practice"} activeChar={topicWordModal} initialDelay={500} />
                   </div>
                ) : (
                  <>
